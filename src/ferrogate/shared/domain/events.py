@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ferrogate.shared.domain.identifiers import TenantId
 
@@ -14,7 +14,7 @@ class DomainEvent:
     tenant_id: TenantId
     event_id: uuid.UUID = field(default_factory=uuid.uuid4)
     occurred_at: datetime = field(
-        default_factory=lambda: datetime.now(tz=timezone.utc)
+        default_factory=lambda: datetime.now(tz=UTC)
     )
 
     @property

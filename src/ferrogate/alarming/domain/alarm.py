@@ -17,25 +17,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from ferrogate.shared.domain.identifiers import TagId, TenantId
 from ferrogate.shared.errors import DomainError
 
 
-class AlarmState(str, Enum):
+class AlarmState(StrEnum):
     NORMAL = "normal"
     ACTIVE = "active"
     ACKNOWLEDGED = "acknowledged"
     CLEARED = "cleared"
 
 
-class Comparison(str, Enum):
+class Comparison(StrEnum):
     ABOVE = "above"
     BELOW = "below"
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"

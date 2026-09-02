@@ -16,9 +16,10 @@ sent_at y un numero de secuencia monotono por gateway.
 from __future__ import annotations
 
 import base64
+import binascii
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from cryptography.exceptions import InvalidSignature
@@ -112,7 +113,7 @@ def verify(
             sent_at=payload["sent_at"],
             samples=samples,
         )
-    except (KeyError, TypeError, ValueError, base64.binascii.Error) as exc:
+    except (KeyError, TypeError, ValueError, binascii.Error) as exc:
         raise SecurityViolation("sobre malformado") from exc
 
     if len(envelope.samples) > MAX_SAMPLES:
@@ -150,4 +151,4 @@ def _parse_timestamp(value: str) -> datetime:
         raise SecurityViolation(f"timestamp invalido: {value!r}") from exc
     if parsed.tzinfo is None:
         raise SecurityViolation("el timestamp debe llevar zona horaria")
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)

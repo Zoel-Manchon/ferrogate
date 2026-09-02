@@ -9,10 +9,10 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class FaultMode(str, Enum):
+class FaultMode(StrEnum):
     NONE = "none"
     STUCK_AT = "stuck_at"          # sensor congelado: el valor no cambia
     OUT_OF_RANGE = "out_of_range"  # pico fisicamente imposible
@@ -46,7 +46,10 @@ class SignalGenerator:
         if self.fault is FaultMode.DRIFT:
             self._drift += (self.high - self.low) * 0.0005
             value += self._drift
-        elif self.fault is FaultMode.OUT_OF_RANGE and random.random() < 0.05:
+        # random del modulo estandar es correcto aqui: esto simula ruido y
+        # averias de un contador, no genera material criptografico. Lo que
+        # SI se firma son los sobres, y esa clave la produce `cryptography`.
+        elif self.fault is FaultMode.OUT_OF_RANGE and random.random() < 0.05:  # noqa: S311
             value = self.high * 10
 
         self._last = value

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -13,7 +14,7 @@ class PostgresAuditLog:
     def __init__(self, engine: Engine) -> None:
         self._engine = engine
 
-    def record(self, tenant_id: TenantId, event: str, detail: dict) -> None:
+    def record(self, tenant_id: TenantId, event: str, detail: dict[str, Any]) -> None:
         with self._engine.connect() as conn, tenant_scope(conn, tenant_id) as scoped:
             scoped.execute(
                 text("INSERT INTO audit_events (tenant_id, event, detail) "

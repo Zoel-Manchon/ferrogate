@@ -42,6 +42,15 @@ per-file-ignores = { "tests/*" = ["S101"] }
 strict = true
 packages = ["ferrogate"]
 
+# influxdb_client trae py.typed, pero su __init__ no reexporta de forma
+# explicita y sus builders no estan anotados, asi que en strict envenena
+# cada fichero que lo toca. El override es para ESE modulo y solo ese:
+# el resto del codigo sigue comprobandose entero.
+[[tool.mypy.overrides]]
+module = "influxdb_client.*"
+follow_imports = "skip"
+ignore_missing_imports = true
+
 [tool.bandit]
 exclude_dirs = ["tests", "simulators"]
 

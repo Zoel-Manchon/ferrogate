@@ -3,7 +3,7 @@
 Estos son los tests que demuestran el aislamiento entre tenants sin
 necesidad de levantar docker.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -13,7 +13,10 @@ from cryptography.x509.oid import NameOID
 from ferrogate.assets.domain.asset import Asset
 from ferrogate.assets.domain.tag_definition import TagDefinition
 from ferrogate.assets.domain.value_objects import (
-    DataType, EngineeringRange, ModbusAddress, Unit,
+    DataType,
+    EngineeringRange,
+    ModbusAddress,
+    Unit,
 )
 from ferrogate.ingestion.application.ingest_telemetry import IngestTelemetry
 from ferrogate.ingestion.infrastructure.mqtt_ingest import EnvelopeProcessor
@@ -21,7 +24,7 @@ from ferrogate.shared.domain.clock import FrozenClock
 from ferrogate.shared.domain.identifiers import AssetId, TagId, TenantId
 from ferrogate.shared.security.envelope import Envelope, Sample, sign
 
-NOW = datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
 ACME_ASSET = AssetId(__import__("uuid").UUID("11111111-1111-1111-1111-111111111111"))
 
 

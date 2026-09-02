@@ -34,7 +34,7 @@ class GatewayIdentity:
     gateway_id: GatewayId
 
     @staticmethod
-    def from_san_uri(uri: str) -> "GatewayIdentity":
+    def from_san_uri(uri: str) -> GatewayIdentity:
         match = _URN.match(uri.strip())
         if match is None:
             raise SecurityViolation(f"SAN URI no reconocida: {uri!r}")

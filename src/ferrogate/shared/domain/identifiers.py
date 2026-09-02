@@ -45,7 +45,7 @@ class AssetId:
     value: uuid.UUID
 
     @staticmethod
-    def new() -> "AssetId":
+    def new() -> AssetId:
         return AssetId(uuid.uuid4())
 
     def __str__(self) -> str:
@@ -57,7 +57,7 @@ class TagId:
     value: uuid.UUID
 
     @staticmethod
-    def new() -> "TagId":
+    def new() -> TagId:
         return TagId(uuid.uuid4())
 
     def __str__(self) -> str:

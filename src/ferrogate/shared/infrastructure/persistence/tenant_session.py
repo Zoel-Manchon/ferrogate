@@ -6,8 +6,8 @@ la siguiente peticion hereda el tenant de la anterior.
 """
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 from sqlalchemy.engine import Connection
 from sqlalchemy.sql import text

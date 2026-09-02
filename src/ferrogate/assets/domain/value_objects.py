@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from ferrogate.shared.errors import DomainError
 
 
-class DataType(str, Enum):
+class DataType(StrEnum):
     FLOAT32 = "float32"
     INT16 = "int16"
     UINT16 = "uint16"
@@ -14,7 +14,7 @@ class DataType(str, Enum):
     BOOL = "bool"
 
 
-class Unit(str, Enum):
+class Unit(StrEnum):
     VOLT = "V"
     AMPERE = "A"
     WATT = "W"

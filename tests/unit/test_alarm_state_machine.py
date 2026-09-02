@@ -1,14 +1,17 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from ferrogate.alarming.domain.alarm import (
-    AlarmInstance, AlarmRule, AlarmState, Comparison,
+    AlarmInstance,
+    AlarmRule,
+    AlarmState,
+    Comparison,
 )
 from ferrogate.shared.domain.identifiers import TagId, TenantId
 from ferrogate.shared.errors import DomainError
 
-T0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+T0 = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 def _rule(**kw):

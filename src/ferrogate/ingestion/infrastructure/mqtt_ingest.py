@@ -12,7 +12,10 @@ el sobre se descarta aunque su firma fuese buena en su dia.
 """
 from __future__ import annotations
 
+import json
 import logging
+import uuid
+from datetime import datetime
 
 from ferrogate.ingestion.application.ingest_telemetry import IngestTelemetry, RawSample
 from ferrogate.ingestion.application.ports import SecurityLog
@@ -119,8 +122,6 @@ class EnvelopeProcessor:
 
     @staticmethod
     def _claimed_identity(raw: bytes) -> GatewayIdentity:
-        import json
-
         try:
             declared = json.loads(raw)["identity"]
         except (ValueError, KeyError, TypeError) as exc:
@@ -128,13 +129,9 @@ class EnvelopeProcessor:
         return GatewayIdentity.from_san_uri(declared)
 
 
-def _uuid(value: str):
-    import uuid
-
+def _uuid(value: str) -> uuid.UUID:
     return uuid.UUID(value)
 
 
-def _ts(value: str):
-    from datetime import datetime
-
+def _ts(value: str) -> datetime:
     return datetime.fromisoformat(value)

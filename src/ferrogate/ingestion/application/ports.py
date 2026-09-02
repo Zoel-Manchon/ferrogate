@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Protocol, Sequence
+from collections.abc import Sequence
+from typing import Any, Protocol
 
 from ferrogate.assets.domain.asset import Asset
 from ferrogate.ingestion.domain.measurement import Measurement
@@ -24,7 +25,7 @@ class MeasurementSink(Protocol):
 
 
 class AuditLog(Protocol):
-    def record(self, tenant_id: TenantId, event: str, detail: dict) -> None: ...
+    def record(self, tenant_id: TenantId, event: str, detail: dict[str, Any]) -> None: ...
 
 
 class SecurityLog(Protocol):
@@ -41,5 +42,5 @@ class SecurityLog(Protocol):
         claimed_tenant: str | None,
         claimed_gateway: str | None,
         event: str,
-        detail: dict,
+        detail: dict[str, Any],
     ) -> None: ...

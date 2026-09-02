@@ -1,6 +1,5 @@
-import base64
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from cryptography import x509
@@ -11,7 +10,7 @@ from cryptography.x509.oid import NameOID
 from ferrogate.shared.errors import SecurityViolation
 from ferrogate.shared.security.envelope import Envelope, Sample, sign, verify
 
-NOW = datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
 URN = "urn:ferrogate:tenant:acme:gateway:planta-norte"
 OTHER_URN = "urn:ferrogate:tenant:globex:gateway:planta-sur"
 

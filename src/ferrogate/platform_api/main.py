@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import ssl
 from pathlib import Path
 
 import aiomqtt
@@ -27,11 +28,11 @@ from ferrogate.tenancy.infrastructure.postgres_registry import PostgresGatewayRe
 log = logging.getLogger("platform")
 
 
-def build_tls_context():
-    import ssl
-
+def build_tls_context() -> ssl.SSLContext:
     certs = Path(os.getenv("CERT_DIR", "/certs"))
-    ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=str(certs / "ca.crt"))
+    ctx = ssl.create_default_context(
+        ssl.Purpose.SERVER_AUTH, cafile=str(certs / "ca.crt")
+    )
     ctx.load_cert_chain(
         certfile=str(certs / "platform-ingest.crt"),
         keyfile=str(certs / "platform-ingest.key"),

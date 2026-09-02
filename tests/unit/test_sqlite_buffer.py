@@ -1,4 +1,6 @@
-import sys, pathlib
+import pathlib
+import sys
+
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "edge"))
 
 from ferrogate_edge.infrastructure.buffer.sqlite_buffer import SqliteBuffer

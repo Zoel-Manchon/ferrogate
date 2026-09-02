@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -20,7 +21,7 @@ class PostgresSecurityLog:
         claimed_tenant: str | None,
         claimed_gateway: str | None,
         event: str,
-        detail: dict,
+        detail: dict[str, Any],
     ) -> None:
         try:
             with self._engine.connect() as conn, conn.begin():

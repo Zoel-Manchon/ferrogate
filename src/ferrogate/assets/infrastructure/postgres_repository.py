@@ -6,7 +6,8 @@ no como control de seguridad.
 """
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -14,7 +15,12 @@ from sqlalchemy.engine import Engine
 from ferrogate.assets.domain.asset import Asset
 from ferrogate.assets.domain.tag_definition import TagDefinition
 from ferrogate.assets.domain.value_objects import (
-    DataType, Deadband, EngineeringRange, ModbusAddress, Scaling, Unit,
+    DataType,
+    Deadband,
+    EngineeringRange,
+    ModbusAddress,
+    Scaling,
+    Unit,
 )
 from ferrogate.shared.domain.identifiers import AssetId, TagId, TenantId
 from ferrogate.shared.infrastructure.persistence.tenant_session import tenant_scope
@@ -55,7 +61,9 @@ class PostgresAssetRepository:
         return [a for a in (self.get(tenant_id, AssetId(r.id)) for r in rows) if a]
 
 
-def _to_tag(row) -> TagDefinition:
+# row es un Row de SQLAlchemy: sus columnas se resuelven en runtime,
+# asi que Any es la anotacion honesta y no una rendicion.
+def _to_tag(row: Any) -> TagDefinition:
     return TagDefinition(
         id=TagId(row.id),
         name=row.name,

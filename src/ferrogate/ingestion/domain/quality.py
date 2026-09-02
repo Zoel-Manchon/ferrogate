@@ -6,10 +6,10 @@ error clasico de los pipelines de telemetria caseros.
 """
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class Quality(str, Enum):
+class Quality(StrEnum):
     GOOD = "good"
     UNCERTAIN = "uncertain"
     BAD = "bad"
@@ -19,7 +19,7 @@ class Quality(str, Enum):
         return self is not Quality.BAD
 
 
-class QualityReason(str, Enum):
+class QualityReason(StrEnum):
     OK = "ok"
     OUT_OF_RANGE = "out_of_range"
     STALE = "stale"

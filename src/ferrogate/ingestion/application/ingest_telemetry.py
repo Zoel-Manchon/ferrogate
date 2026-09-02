@@ -10,9 +10,9 @@ Invertir 1 y 2 es exactamente como se cuelan datos de un tenant en otro.
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Sequence
 
 from ferrogate.ingestion.application.ports import (
     AssetRepository,
@@ -110,10 +110,12 @@ class IngestTelemetry:
 
             value = tag.to_engineering(sample.raw_value)
 
+            skew = abs((now - sample.source_timestamp).total_seconds())
+
             quality, reason = Quality.GOOD, QualityReason.OK
             if not tag.is_in_range(value):
                 quality, reason = Quality.BAD, QualityReason.OUT_OF_RANGE
-            elif abs((now - sample.source_timestamp).total_seconds()) > MAX_CLOCK_SKEW_SECONDS:
+            elif skew > MAX_CLOCK_SKEW_SECONDS:
                 quality, reason = Quality.UNCERTAIN, QualityReason.CLOCK_SKEW
 
             out.append(

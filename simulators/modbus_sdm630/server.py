@@ -17,14 +17,13 @@ import os
 import struct
 import time
 
+from plant import FaultMode, SignalGenerator
 from pymodbus.datastore import (
     ModbusSequentialDataBlock,
     ModbusServerContext,
     ModbusSlaveContext,
 )
 from pymodbus.server import StartAsyncTcpServer
-
-from plant import FaultMode, SignalGenerator
 from register_map import INPUT_REGISTERS
 
 log = logging.getLogger("sdm630")
@@ -101,8 +100,18 @@ async def main() -> None:
         os.getenv("FAULT_MODE", "none"),
     )
 
-    asyncio.create_task(drive(context, unit_id))
-    await StartAsyncTcpServer(context=context, address=("0.0.0.0", port))
+    # Guardar la referencia no es ceremonia: asyncio solo mantiene una
+    # referencia debil a la tarea, asi que sin esto el recolector puede
+    # llevarsela a media ejecucion y el simulador deja de mover registros
+    # sin un solo error en el log.
+    driver = asyncio.create_task(drive(context, unit_id))
+    try:
+        # 0.0.0.0 es deliberado: el simulador corre dentro de un contenedor
+        # y el colector lo alcanza por la red de docker. No se publica al
+        # host salvo que docker-compose lo mapee.
+        await StartAsyncTcpServer(context=context, address=("0.0.0.0", port))  # noqa: S104
+    finally:
+        driver.cancel()
 
 
 if __name__ == "__main__":

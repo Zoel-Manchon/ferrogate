@@ -1,13 +1,15 @@
-import asyncio, sys, pathlib
+import asyncio
+import pathlib
+import sys
+
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "edge"))
 
-import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-
 from ferrogate_edge.application.collect import CollectCycle
 from ferrogate_edge.domain.tag_mapping import SiteConfig, TagMapping
 from ferrogate_edge.infrastructure.buffer.sqlite_buffer import SqliteBuffer
+
 from ferrogate.shared.security.envelope import Sample
 
 CONFIG = SiteConfig(
@@ -50,8 +52,9 @@ def test_si_el_enlace_cae_no_se_pierde_el_dato(tmp_path):
 def test_al_recuperar_se_drena_el_buffer_primero(tmp_path):
     buf = SqliteBuffer(tmp_path / "o.db")
     pem = key_pem()
-    asyncio.run(CollectCycle(CONFIG, FakeReader(), BrokenPublisher(), buf, pem).run_once())
-    asyncio.run(CollectCycle(CONFIG, FakeReader(), BrokenPublisher(), buf, pem).run_once())
+    cycle = CollectCycle(CONFIG, FakeReader(), BrokenPublisher(), buf, pem)
+    asyncio.run(cycle.run_once())
+    asyncio.run(cycle.run_once())
     assert buf.depth() == 2
 
     publisher = RecordingPublisher()
@@ -61,9 +64,11 @@ def test_al_recuperar_se_drena_el_buffer_primero(tmp_path):
     assert buf.depth() == 0
 
 
-def test_el_topic_lo_construye_el_propio_gateway():
+def test_el_topic_lo_construye_el_propio_gateway(tmp_path):
+    # tmp_path en lugar de /tmp/t.db cableado: dos ejecuciones en paralelo
+    # compartian el mismo fichero, y en Windows esa ruta no existe siquiera.
     cycle = CollectCycle(CONFIG, FakeReader(), RecordingPublisher(),
-                         SqliteBuffer(pathlib.Path("/tmp/t.db")), key_pem())
+                         SqliteBuffer(tmp_path / "t.db"), key_pem())
     assert cycle.topic == "ferrogate/acme/planta-norte/telemetry/data"
     assert cycle.identity_urn == "urn:ferrogate:tenant:acme:gateway:planta-norte"
 
