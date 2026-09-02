@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+sbom.json
+ops/pki/out/
+*.key
+*.crt
+*.srl
+
+# Cachés de herramientas y metadatos de build, regenerables.
+.import_linter_cache/
+*.egg-info/

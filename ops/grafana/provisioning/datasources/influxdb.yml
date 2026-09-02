@@ -1,0 +1,32 @@
+# Datasource provisionado como codigo: nada de clicar en la UI.
+# Un datasource por tenant, apuntando cada uno a SU bucket. El aislamiento
+# se mantiene tambien en la capa de visualizacion; si un dia asocias cada
+# datasource a una organizacion de Grafana, el aislamiento es completo.
+
+apiVersion: 1
+
+datasources:
+  - name: tenant-acme
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    jsonData:
+      version: Flux
+      organization: ferrogate
+      defaultBucket: tenant-acme
+      tlsSkipVerify: true
+    secureJsonData:
+      token: ${INFLUX_TOKEN}
+    isDefault: true
+
+  - name: tenant-globex
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    jsonData:
+      version: Flux
+      organization: ferrogate
+      defaultBucket: tenant-globex
+      tlsSkipVerify: true
+    secureJsonData:
+      token: ${INFLUX_TOKEN}

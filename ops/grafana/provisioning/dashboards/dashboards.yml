@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: ferrogate
+    orgId: 1
+    folder: Ferrogate
+    type: file
+    disableDeletion: false
+    # Los paneles son codigo: se editan en el repo, no en la UI.
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

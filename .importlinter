@@ -1,0 +1,22 @@
+[importlinter]
+root_package = ferrogate
+
+[importlinter:contract:capas]
+name = El dominio no conoce la infraestructura
+type = layers
+# Los contextos aun sin adaptadores se marcan opcionales con ():
+# el contrato no falla por no existir, pero se aplica en cuanto aparecen.
+layers =
+    ferrogate.platform_api
+    (ferrogate.alarming.infrastructure)
+    ferrogate.alarming.application
+    ferrogate.alarming.domain
+    ferrogate.shared.domain
+
+[importlinter:contract:contextos]
+name = Los contextos acotados no se importan entre si
+type = independence
+modules =
+    ferrogate.tenancy
+    ferrogate.assets
+    ferrogate.alarming

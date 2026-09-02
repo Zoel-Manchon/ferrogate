@@ -1,0 +1,135 @@
+name: ferrogate
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ferrogate
+      POSTGRES_USER: ferrogate
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en .env}
+    volumes:
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ferrogate"]
+      interval: 5s
+
+  influxdb:
+    image: influxdb:2.7-alpine
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ferrogate
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_PASSWORD:?define INFLUX_PASSWORD en .env}
+      DOCKER_INFLUXDB_INIT_ORG: ferrogate
+      # Un bucket por tenant: la frontera la respeta el motor, no la query
+      DOCKER_INFLUXDB_INIT_BUCKET: tenant-acme
+      # Sin esto el token es aleatorio y no puedes referenciarlo desde .env
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN:?define INFLUX_TOKEN en .env}
+    ports: ["8086:8086"]
+    volumes:
+      # Crea el resto de buckets por tenant tras el setup inicial
+      - ./ops/influx/init-buckets.sh:/docker-entrypoint-initdb.d/init-buckets.sh:ro
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 5s
+      retries: 12
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports: ["8883:8883"]
+    volumes:
+      - ./ops/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./ops/mosquitto/acl:/mosquitto/config/acl:ro
+      - ./ops/pki/out:/mosquitto/certs:ro
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    # El 3000 es el puerto mas disputado de una maquina de desarrollo. Si ya
+    # esta ocupado, compose aborta el "up" ENTERO y deja medio stack sin
+    # arrancar, con un error que solo menciona a Grafana.
+    ports: ["${GRAFANA_PORT:-3000}:3000"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?define GRAFANA_PASSWORD en .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      INFLUX_TOKEN: ${INFLUX_TOKEN:?define INFLUX_TOKEN en .env}
+    volumes:
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
+
+  # Perfiles: cada tenant levanta su propio sitio simulado.
+  # docker compose --profile acme --profile globex up
+  sim-acme:
+    profiles: ["acme"]
+    build: ./simulators/modbus_sdm630
+    ports: ["5020:5020"]
+    environment:
+      TENANT_ID: acme
+      GATEWAY_ID: planta-norte
+      MODBUS_PORT: 5020
+
+  sim-globex:
+    profiles: ["globex"]
+    build: ./simulators/modbus_sdm630
+    ports: ["5021:5020"]
+    environment:
+      TENANT_ID: globex
+      GATEWAY_ID: planta-sur
+      MODBUS_PORT: 5020
+      # Sitio con un sensor averiado, para tener siempre un caso de
+      # calidad degradada visible.
+      #
+      # out_of_range y no stuck_at: un valor CONGELADO cae dentro del rango
+      # de ingenieria del tag, asi que hoy se marca como "good". Detectar
+      # un sensor pegado exige comparar con la lectura anterior y aun no
+      # esta implementado (el codigo de calidad STALE existe sin usar).
+      FAULT_TAG: voltage_l1
+      FAULT_MODE: out_of_range
+
+  platform-ingest:
+    build:
+      context: .
+      dockerfile: Dockerfile.platform
+    depends_on:
+      postgres: {condition: service_healthy}
+      influxdb: {condition: service_healthy}
+    environment:
+      DATABASE_URL: postgresql+psycopg://ferrogate:${POSTGRES_PASSWORD}@postgres/ferrogate
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: ${INFLUX_TOKEN:?}
+      INFLUX_ORG: ferrogate
+    volumes:
+      - ./ops/pki/out:/certs:ro
+    read_only: true
+    # read_only necesita un /tmp escribible para psycopg y para el runtime
+    tmpfs: ["/tmp"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+
+  edge-acme:
+    profiles: ["acme"]
+    build: {context: ., dockerfile: edge/Dockerfile}
+    depends_on: [mosquitto, sim-acme]
+    environment:
+      SITE_CONFIG: /app/ferrogate_edge/config/acme-planta-norte.yaml
+      BUFFER_PATH: /var/lib/ferrogate/outbox.db
+    volumes:
+      - ./ops/pki/out:/certs:ro
+      - edge-acme-buffer:/var/lib/ferrogate
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+
+  edge-globex:
+    profiles: ["globex"]
+    build: {context: ., dockerfile: edge/Dockerfile}
+    depends_on: [mosquitto, sim-globex]
+    environment:
+      SITE_CONFIG: /app/ferrogate_edge/config/globex-planta-sur.yaml
+      BUFFER_PATH: /var/lib/ferrogate/outbox.db
+    volumes:
+      - ./ops/pki/out:/certs:ro
+      - edge-globex-buffer:/var/lib/ferrogate
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+
+volumes:
+  edge-acme-buffer:
+  edge-globex-buffer:

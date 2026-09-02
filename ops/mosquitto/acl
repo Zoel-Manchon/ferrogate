@@ -1,0 +1,27 @@
+# ACL por identidad de certificado.
+#
+# use_identity_as_username hace que el username sea el CN del certificado,
+# que es "<tenant>.<gateway>" -- con PUNTO. Los topics usan
+# "<tenant>/<gateway>" -- con BARRA. Por eso NO se puede usar el patron
+# "pattern write ferrogate/%u/telemetry/#": nunca casaria, y el broker
+# denegaria toda publicacion en silencio.
+#
+# Se declara cada gateway explicitamente. Para un laboratorio con dos
+# tenants es lo correcto y ademas es auditable de un vistazo. A escala
+# real esto se sustituye por un plugin de autenticacion contra la tabla
+# gateways, que ya guarda el certificado enrolado.
+#
+# Esta ACL es la PRIMERA barrera. La segunda es la firma del sobre, que
+# la ingesta verifica sin confiar en el broker.
+
+user acme.planta-norte
+topic write ferrogate/acme/planta-norte/telemetry/#
+topic read  ferrogate/acme/planta-norte/commands/#
+
+user globex.planta-sur
+topic write ferrogate/globex/planta-sur/telemetry/#
+topic read  ferrogate/globex/planta-sur/commands/#
+
+# El servicio de ingesta solo lee, nunca publica telemetria.
+user platform-ingest
+topic read ferrogate/#

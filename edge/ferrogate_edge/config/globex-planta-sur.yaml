@@ -1,0 +1,17 @@
+# Mapa de tags del sitio. Editar este fichero es anadir un dispositivo;
+# no hace falta tocar codigo ni reconstruir la imagen.
+tenant_id: globex
+gateway_id: planta-sur
+poll_interval_seconds: 5
+
+device:
+  host: sim-globex
+  port: 5020
+
+tags:
+  - { asset_id: "22222222-2222-2222-2222-222222222222", tag_name: voltage_l1, unit_id: 1, register: 0 }
+  - { asset_id: "22222222-2222-2222-2222-222222222222", tag_name: voltage_l2, unit_id: 1, register: 2 }
+  - { asset_id: "22222222-2222-2222-2222-222222222222", tag_name: voltage_l3, unit_id: 1, register: 4 }
+  - { asset_id: "22222222-2222-2222-2222-222222222222", tag_name: current_l1, unit_id: 1, register: 6 }
+  - { asset_id: "22222222-2222-2222-2222-222222222222", tag_name: total_power, unit_id: 1, register: 52 }
+  - { asset_id: "22222222-2222-2222-2222-222222222222", tag_name: frequency,  unit_id: 1, register: 70 }

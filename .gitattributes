@@ -1,0 +1,10 @@
+# El stack exige POSIX y el repo se clona tambien desde Windows. Sin esto,
+# core.autocrlf convierte los scripts a CRLF al hacer commit y el contenedor
+# falla con "bad interpreter: /bin/bash^M", que es un error que no se parece
+# en nada a su causa.
+*.sh        text eol=lf
+Makefile    text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.sql       text eol=lf
+Dockerfile* text eol=lf
