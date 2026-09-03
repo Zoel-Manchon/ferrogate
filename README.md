@@ -44,8 +44,23 @@ Puede reenviar, reordenar o mezclar mensajes, pero no fabricar uno válido,
 porque la firma se verifica contra el certificado enrolado en Postgres y no
 contra nada que venga del topic.
 
-Pendiente: adaptador OPC-UA, contexto de alarmas conectado al pipeline,
-paneles de Grafana y test de integracion con dos tenants sobre docker.
+Los paneles de Grafana ya estan: `ops/grafana/provisioning` aprovisiona el
+datasource de InfluxDB y un dashboard de telemetria con diez paneles repartidos
+en tres filas.
+
+Pendiente, por orden de dependencia:
+
+- **Conectar el contexto de alarmas al pipeline.** El dominio ya esta escrito:
+  `alarming/domain/alarm.py` lleva la maquina de estados y su test unitario.
+  Falta el caso de uso que la evalua contra cada medida ingerida y la
+  infraestructura que la persiste y la notifica; hoy `alarming/application/` e
+  `alarming/infrastructure/` solo contienen `__init__.py`.
+- **Test de integracion con dos tenants sobre Docker.** El `docker-compose.yml`
+  ya levanta `sim-acme` y `sim-globex` con sus dos colectores edge; falta la
+  prueba que arranque el stack y verifique que ningun dato de un tenant cruza
+  al bucket ni a las filas con RLS del otro. `tests/integration/` esta vacio.
+- **Adaptador OPC-UA.** Hoy `opcua` existe solo como valor del enum de protocolo
+  en `tag_definition.py`: falta el cliente y su mapeo a `TagDefinition`.
 
 ## Arranque
 
