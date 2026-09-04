@@ -1,120 +1,83 @@
 # Ferrogate
 
-Plataforma multi-tenant de telemetría industrial. Gateways edge que hablan
-Modbus TCP/RTU y OPC-UA contra dispositivos simulados, normalizan a un modelo
-de tags con calidad de dato, y publican por MQTT sobre mTLS hacia una
-plataforma que aísla a cada cliente en el motor, no en el código.
+**Multi-tenant industrial telemetry, with the tenant boundary enforced by the database
+engine rather than by remembering to write a `WHERE` clause.**
 
-DDD con cuatro contextos acotados, arquitectura hexagonal verificada por
-tests que fallan el build, y seguridad tratada como requisito de dominio.
-
-## Demo
-
-Simulador Modbus, colector edge firmando en el sitio, ingesta verificando la
-firma contra el certificado enrolado, y la medida llegando a InfluxDB.
+Edge gateways speak Modbus TCP/RTU against simulated devices, normalise readings into a
+tag model that carries data quality, and publish over MQTT on mTLS to a platform where
+every reading arrives inside an envelope signed at the edge.
 
 https://github.com/user-attachments/assets/a6826689-530c-48cd-af2b-8a3253fda893
 
-## Estado
+<sub>A Modbus simulator, the edge collector signing on site, ingestion verifying the
+signature against the enrolled certificate, and the measurement landing in InfluxDB.</sub>
 
-Recorrido completo funcionando: simulador Modbus -> colector edge -> MQTT
-sobre mTLS con sobre firmado -> ingesta -> InfluxDB -> Grafana.
-62 tests, dos contratos de arquitectura, bandit limpio.
+---
+
+## At a glance
+
+|  |  |
+| --- | --- |
+| **What it is** | The path an industrial reading takes from a Modbus register to a Grafana panel, with the tenant boundary held at every step. |
+| **The one idea** | The broker is **not** in the trust base. It can replay, reorder or mix messages; it cannot forge one, because the signature is verified against the certificate enrolled in Postgres and never against anything the topic claims. |
+| **Built with** | Python · DDD with four bounded contexts · PostgreSQL 17 with `FORCE ROW LEVEL SECURITY` · InfluxDB · Mosquitto · Grafana |
+| **Size** | ~2 100 lines · **62 tests** · two architecture contracts that fail the build |
+| **Isolation** | Row Level Security with `FORCE`, scoped to the transaction — a query that forgets to set the tenant returns zero rows, not somebody else's |
+| **Identity** | Per-gateway certificate, identity in the SAN, envelope signed with RSA-PSS at the edge, sequence numbers against replay |
+| **Run it** | `make up && make seed && make verify` — POSIX only; on Windows use WSL2 |
+
+**Contents** — [Architecture](#architecture) ·
+[How a reading becomes trusted data](#how-a-reading-becomes-trusted-data) ·
+[Isolation in the engine](#isolation-in-the-engine-not-in-the-code) ·
+[Quick start](#quick-start) · [Status](#status) · [Decisions](#decisions) ·
+[What it does not do](#what-it-does-not-do)
+
+---
+
+## Architecture
+
+The whole path works end to end: Modbus simulator → edge collector → MQTT over mTLS with
+a signed envelope → ingestion → InfluxDB → Grafana.
 
 ```mermaid
 flowchart TB
-    SIM["Simulador SDM630<br/>Modbus TCP"] --> EDGE
-    EDGE["Colector edge<br/><i>un sitio, un tenant</i>"]
-    EDGE -->|"firma con su clave privada"| ENV["Sobre firmado<br/>identity · sequence · sent_at"]
-    ENV -->|"MQTT 5 sobre mTLS"| MQ["Mosquitto<br/><i>fuera de la base de confianza</i>"]
-    MQ --> ING["EnvelopeProcessor<br/>verifica contra el cert enrolado"]
-    ING --> USE["IngestTelemetry<br/>identidad · tenant · calidad"]
-    USE --> INFLUX[("InfluxDB<br/>bucket por tenant")]
+    SIM["SDM630 simulator<br/>Modbus TCP"] --> EDGE
+    EDGE["Edge collector<br/><i>one site, one tenant</i>"]
+    EDGE -->|"signs with its private key"| ENV["Signed envelope<br/>identity · sequence · sent_at"]
+    ENV -->|"MQTT 5 over mTLS"| MQ["Mosquitto<br/><i>outside the trust base</i>"]
+    MQ --> ING["EnvelopeProcessor<br/>verifies against the enrolled cert"]
+    ING --> USE["IngestTelemetry<br/>identity · tenant · quality"]
+    USE --> INFLUX[("InfluxDB<br/>a bucket per tenant")]
     INFLUX --> GRAF["Grafana"]
-    USE -.->|rechazos| PG[("PostgreSQL<br/>RLS FORCE · auditoria")]
-    EDGE -.->|"si el enlace cae"| BUF[("SQLite<br/>buffer local")]
-    BUF -.->|"se drena ANTES de lo nuevo"| ENV
+    USE -.->|rejections| PG[("PostgreSQL<br/>RLS FORCE · audit")]
+    EDGE -.->|"if the link drops"| BUF[("SQLite<br/>local buffer")]
+    BUF -.->|"drained BEFORE anything new"| ENV
 
     classDef untrusted fill:#2b2010,stroke:#b8860b,color:#f7f0e0
     class MQ untrusted
 ```
 
-El broker aparece marcado a propósito: **no está en la base de confianza**.
-Puede reenviar, reordenar o mezclar mensajes, pero no fabricar uno válido,
-porque la firma se verifica contra el certificado enrolado en Postgres y no
-contra nada que venga del topic.
+The broker is marked on purpose: **it is not in the trust base**. It can forward, reorder
+or mix messages, but it cannot fabricate a valid one, because the signature is checked
+against the certificate enrolled in Postgres rather than against anything arriving with
+the message.
 
-Los paneles de Grafana ya estan: `ops/grafana/provisioning` aprovisiona el
-datasource de InfluxDB y un dashboard de telemetria con diez paneles repartidos
-en tres filas.
+### Four bounded contexts
 
-Pendiente, por orden de dependencia:
-
-- **Conectar el contexto de alarmas al pipeline.** El dominio ya esta escrito:
-  `alarming/domain/alarm.py` lleva la maquina de estados y su test unitario.
-  Falta el caso de uso que la evalua contra cada medida ingerida y la
-  infraestructura que la persiste y la notifica; hoy `alarming/application/` e
-  `alarming/infrastructure/` solo contienen `__init__.py`.
-- **Test de integracion con dos tenants sobre Docker.** El `docker-compose.yml`
-  ya levanta `sim-acme` y `sim-globex` con sus dos colectores edge; falta la
-  prueba que arranque el stack y verifique que ningun dato de un tenant cruza
-  al bucket ni a las filas con RLS del otro. `tests/integration/` esta vacio.
-- **Adaptador OPC-UA.** Hoy `opcua` existe solo como valor del enum de protocolo
-  en `tag_definition.py`: falta el cliente y su mapeo a `TagDefinition`.
-
-## Arranque
-
-Requiere un entorno POSIX. En Windows, usa WSL2: el stack (openssl, montajes
-de volumen, permisos de Mosquitto) asume rutas y permisos POSIX y Git Bash
-da problemas.
-
-```bash
-python -m venv .venv && source .venv/bin/activate
-make install              # instala ferrogate en editable + dependencias dev
-cp .env.example .env      # rellena las contraseñas
-make pki                  # CA de laboratorio + certificados de gateway
-make up                   # levanta todo el stack
-make seed                 # enrola gateways, activos y tags
-make verify               # comprueba la cadena completa de extremo a extremo
-make test                 # unitarios y de arquitectura
-make arch                 # contratos de capas e independencia de contextos
-make security             # bandit, pip-audit
-```
-
-## Decisiones
-
-- Aislamiento por Row Level Security con `FORCE` — [ADR 0001](docs/adr/0001-aislamiento-de-tenant.md)
-- Identidad del gateway en el SAN del certificado — [ADR 0002](docs/adr/0002-identidad-de-gateway.md)
-- Telemetria firmada extremo a extremo — [ADR 0005](docs/adr/0005-sobre-firmado.md)
-- Modelo de amenazas STRIDE — [docs/security/threat-model.md](docs/security/threat-model.md)
-
-## Estructura
-
-```
-src/ferrogate/
-  shared/        kernel: TenantId, eventos, reloj, identidad de gateway
-  tenancy/       tenants, gateways, enrolamiento
-  assets/        core domain: Asset, TagDefinition, unidades y rangos
-  ingestion/     normalización, calidad de dato, guardia de identidad
-  alarming/      máquina de estados con histéresis y duración mínima
-edge/            colector: un sitio, un tenant, sin lógica multi-tenant
-simulators/      SDM630 Modbus + línea OPC-UA, con inyección de fallos
-```
-
-Los cuatro contextos son independientes: `lint-imports` falla el build si uno
-importa a otro. Solo el kernel compartido es dependencia legítima de todos.
+They do not import each other. `lint-imports` fails the build if one does; only the
+shared kernel is a legitimate dependency of all of them.
 
 ```mermaid
 flowchart TB
-    subgraph CTX["Contextos acotados · no se importan entre si"]
+    subgraph CTX["Bounded contexts · none imports another"]
         direction LR
-        TEN["tenancy<br/>tenants · gateways<br/>enrolamiento"]
+        TEN["tenancy<br/>tenants · gateways<br/>enrolment"]
         AST["assets<br/><b>core domain</b><br/>Asset · TagDefinition"]
-        ING["ingestion<br/>normalizacion<br/>calidad · guardia"]
-        ALM["alarming<br/>histeresis<br/>duracion minima"]
+        ING["ingestion<br/>normalisation<br/>quality · guard"]
+        ALM["alarming<br/>hysteresis<br/>minimum duration"]
     end
 
-    SHR["shared · kernel compartido<br/>TenantId · GatewayIdentity · Clock · Envelope · errores"]
+    SHR["shared · the shared kernel<br/>TenantId · GatewayIdentity · Clock · Envelope · errors"]
 
     TEN --> SHR
     AST --> SHR
@@ -125,61 +88,146 @@ flowchart TB
     class AST core
 ```
 
-### El orden de las comprobaciones es la seguridad
+| Context | Responsibility | Lines |
+| --- | --- | --- |
+| `shared` | The kernel: `TenantId`, `GatewayIdentity`, the clock, the envelope, the error types | 403 |
+| `tenancy` | Tenants, gateways and enrolment — who is allowed to speak at all | 66 |
+| `assets` | The core domain: `Asset`, `TagDefinition`, units and ranges | 286 |
+| `ingestion` | Normalisation, data quality, and the identity guard that decides what is accepted | 512 |
+| `alarming` | A state machine with hysteresis and a minimum duration | 111 |
+| `edge/` | The collector: one site, one tenant, and no multi-tenant logic anywhere in it | 443 |
+| `simulators/` | An SDM630 over Modbus and an OPC-UA line, with fault injection | 202 |
 
-Cada paso descarta antes de gastar. Invertir 3 y 4 —comprobar el topic antes
-que la identidad probada— es exactamente como se cuelan datos de un tenant en
-otro.
+```text
+src/ferrogate/
+  shared/        kernel: TenantId, events, clock, gateway identity
+  tenancy/       tenants, gateways, enrolment
+  assets/        core domain: Asset, TagDefinition, units and ranges
+  ingestion/     normalisation, data quality, identity guard
+  alarming/      state machine with hysteresis and minimum duration
+edge/            collector: one site, one tenant, no multi-tenant logic
+simulators/      SDM630 Modbus + an OPC-UA line, with fault injection
+```
+
+The edge collector knowing nothing about multi-tenancy is the point, not an omission: a
+gateway that cannot name a second tenant cannot leak into one.
+
+---
+
+## How a reading becomes trusted data
+
+Each step discards before it spends. Swapping 3 and 4 — checking the topic before the
+proven identity — is exactly how one tenant's data ends up in another's.
 
 ```mermaid
 flowchart TD
-    R["Llega un sobre por MQTT"] --> S{"¿menos de 256 KB?"}
-    S -->|no| X1["descartar sin parsear"]
-    S -->|si| ID{"¿identity legible?<br/><i>solo para localizar el cert</i>"}
+    R["An envelope arrives over MQTT"] --> S{"under 256 KB?"}
+    S -->|no| X1["discard without parsing"]
+    S -->|yes| ID{"is the identity readable?<br/><i>only to find the certificate</i>"}
     ID -->|no| X2["ingest.unreadable_identity"]
-    ID -->|si| CERT{"¿gateway enrolado en Postgres?"}
-    CERT -->|no| X3["ingest.unknown_or_revoked_gateway<br/><i>un revocado no tiene cert</i>"]
-    CERT -->|si| SIG{"¿firma RSA-PSS valida?"}
+    ID -->|yes| CERT{"is the gateway enrolled in Postgres?"}
+    CERT -->|no| X3["ingest.unknown_or_revoked_gateway<br/><i>a revoked gateway has no certificate</i>"]
+    CERT -->|yes| SIG{"is the RSA-PSS signature valid?"}
     SIG -->|no| X4["ingest.envelope_rejected"]
-    SIG -->|si| FRESH{"¿sent_at dentro de 10 min?"}
+    SIG -->|yes| FRESH{"is sent_at within 10 minutes?"}
     FRESH -->|no| X4
-    FRESH -->|si| SEQ{"¿sequence &gt; ultima vista?"}
-    SEQ -->|no| X5["reenvio: rechazado"]
-    SEQ -->|si| PROVEN["identidad PROBADA<br/><i>del sobre firmado, nunca del topic</i>"]
-    PROVEN --> TOP{"¿la identidad posee el topic?<br/><i>por segmentos, no startswith</i>"}
+    FRESH -->|yes| SEQ{"is sequence &gt; the last one seen?"}
+    SEQ -->|no| X5["a replay: rejected"]
+    SEQ -->|yes| PROVEN["identity PROVEN<br/><i>from the signed envelope, never from the topic</i>"]
+    PROVEN --> TOP{"does that identity own the topic?<br/><i>segment by segment, not startswith</i>"}
     TOP -->|no| X6["ingest.topic_identity_mismatch"]
-    TOP -->|si| ASSET{"¿el activo es de ese tenant?"}
+    TOP -->|yes| ASSET{"does the asset belong to that tenant?"}
     ASSET -->|no| X7["TenantIsolationViolation<br/>ingest.rejected_by_domain"]
-    ASSET -->|si| OK["normalizar · evaluar calidad · escribir"]
+    ASSET -->|yes| OK["normalise · assess quality · write"]
 ```
 
-### Aislamiento en el motor, no en el código
+---
+
+## Isolation in the engine, not in the code
 
 ```mermaid
 flowchart TB
-    REQ["Peticion de un tenant"] --> TS["tenant_scope()<br/>set_config('ferrogate.tenant_id', ..., TRUE)"]
-    TS -->|"local a la TRANSACCION"| TX["Transaccion"]
+    REQ["A request from a tenant"] --> TS["tenant_scope()<br/>set_config('ferrogate.tenant_id', ..., TRUE)"]
+    TS -->|"local to the TRANSACTION"| TX["Transaction"]
     TX --> POL["POLICY tenant_isolation<br/>USING + WITH CHECK"]
-    POL --> ROWS[("Solo las filas del tenant")]
+    POL --> ROWS[("Only that tenant's rows")]
 
-    NOSET["Consulta sin tenant fijado"] -.-> NULLC["current_setting(..., TRUE) = NULL<br/><b>NULL no casa con nada</b>"]
-    NULLC -.-> EMPTY[("cero filas")]
+    NOSET["A query with no tenant set"] -.-> NULLC["current_setting(..., TRUE) = NULL<br/><b>NULL matches nothing</b>"]
+    NULLC -.-> EMPTY[("zero rows")]
 
     classDef safe fill:#12261f,stroke:#3f9d70,color:#e9f6ef
     class EMPTY safe
 ```
 
-`FORCE ROW LEVEL SECURITY` aplica la política **también al propietario de la
-tabla**, que es el caso que la gente olvida. Y el ámbito es local a la
-transacción: con un pool de conexiones, un `set_config` de sesión haría que la
-siguiente petición heredase el tenant de la anterior.
+`FORCE ROW LEVEL SECURITY` applies the policy **to the table's owner as well**, which is
+the case people forget. And the scope is local to the transaction: with a connection
+pool, a session-level `set_config` would leave the next request inheriting the previous
+request's tenant.
 
-## Lo que no hace
+The failure mode is the right way round. Forgetting to set the tenant returns **zero
+rows**, not somebody else's — a bug that is loud and safe rather than quiet and a breach.
 
-No pretende sustituir a un SCADA ni a un historian. Es un banco de pruebas
-reproducible sin hardware: si tienes un contador real, el simulador se
-cambia por él sin tocar el dominio — para eso está el puerto `DeviceReader`.
+---
 
-## Licencia
+## Quick start
 
-MIT — ver [LICENSE](LICENSE).
+Requires a POSIX environment. On Windows use WSL2: the stack — openssl, volume mounts,
+Mosquitto's permissions — assumes POSIX paths and permissions, and Git Bash struggles.
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+make install              # editable install + dev dependencies
+cp .env.example .env      # fill in the passwords
+make pki                  # lab CA + gateway certificates
+make up                   # bring the whole stack up
+make seed                 # enrol gateways, assets and tags
+make verify               # check the whole chain end to end
+make test                 # unit and architecture tests
+make arch                 # layer contracts and context independence
+make security             # bandit, pip-audit
+```
+
+---
+
+## Status
+
+Everything above works end to end, with 62 tests, two architecture contracts and a clean
+bandit run. The Grafana panels are in place: `ops/grafana/provisioning` provisions the
+InfluxDB datasource and a telemetry dashboard of ten panels across three rows.
+
+Still open, in dependency order:
+
+- **Wire the alarming context into the pipeline.** The domain is written —
+  `alarming/domain/alarm.py` carries the state machine and its unit test. What is missing
+  is the use case that evaluates it against each ingested measurement, and the
+  infrastructure that persists and notifies; today `alarming/application/` and
+  `alarming/infrastructure/` contain only `__init__.py`.
+- **A two-tenant integration test on Docker.** `docker-compose.yml` already brings up
+  `sim-acme` and `sim-globex` with their two edge collectors; what is missing is the test
+  that starts the stack and proves no data from one tenant crosses into the other's
+  bucket or RLS-protected rows. `tests/integration/` is empty.
+- **An OPC-UA adapter.** Today `opcua` exists only as a value of the protocol enum in
+  `tag_definition.py`: the client and its mapping to `TagDefinition` are missing.
+
+---
+
+## Decisions
+
+- Tenant isolation by Row Level Security with `FORCE` — [ADR 0001](docs/adr/0001-aislamiento-de-tenant.md)
+- Gateway identity in the certificate's SAN — [ADR 0002](docs/adr/0002-identidad-de-gateway.md)
+- End-to-end signed telemetry — [ADR 0005](docs/adr/0005-sobre-firmado.md)
+- STRIDE threat model — [docs/security/threat-model.md](docs/security/threat-model.md)
+
+---
+
+## What it does not do
+
+It does not try to replace a SCADA or a historian. It is a reproducible test bench with
+no hardware: if you have a real meter, the simulator is swapped for it without touching
+the domain — that is what the `DeviceReader` port is for.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
