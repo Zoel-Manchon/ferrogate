@@ -1,5 +1,13 @@
 # Ferrogate
 
+[![CI](https://github.com/Zoel-Manchon/ferrogate/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Zoel-Manchon/ferrogate/actions/workflows/ci.yml)
+![Python 3.12+](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white)
+![PostgreSQL 17 RLS FORCE](https://img.shields.io/badge/PostgreSQL_17-RLS_FORCE-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+![InfluxDB](https://img.shields.io/badge/InfluxDB-22ADF6?style=flat-square&logo=influxdb&logoColor=white)
+![Mosquitto mTLS](https://img.shields.io/badge/Mosquitto-mTLS-660066?style=flat-square&logo=eclipsemosquitto&logoColor=white)
+![DDD 4 bounded contexts](https://img.shields.io/badge/DDD-4_bounded_contexts-1F2A37?style=flat-square)
+![license MIT](https://img.shields.io/badge/license-MIT-2A3340?style=flat-square)
+
 **Multi-tenant industrial telemetry, with the tenant boundary enforced by the database
 engine rather than by remembering to write a `WHERE` clause.**
 
